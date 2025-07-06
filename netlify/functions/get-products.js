@@ -1,5 +1,3 @@
-// netlify/functions/get-products.js
-
 const axios = require("axios");
 
 exports.handler = async function (event, context) {
@@ -19,10 +17,9 @@ exports.handler = async function (event, context) {
       body: JSON.stringify(response.data)
     };
   } catch (error) {
-    console.error("API request failed:", error.message);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Failed to fetch product data." })
+      body: JSON.stringify({ error: error.message })
     };
   }
 };
