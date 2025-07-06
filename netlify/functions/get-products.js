@@ -1,14 +1,16 @@
-const axios = require('axios');
+// netlify/functions/get-products.js
 
-exports.handler = async function(event, context) {
-  const API_URL = 'https://www.mindkits.co.nz/api/v1/products';
-  const API_KEY = '5ff793a4072fc4482937a02cfbd802a6';
+const axios = require("axios");
+
+exports.handler = async function (event, context) {
+  const keyword = event.queryStringParameters.keywords || "";
+  const apiUrl = `https://www.mindkits.co.nz/api/v1/products?filters[item_name][contains]=${encodeURIComponent(keyword)}`;
 
   try {
-    const response = await axios.get(API_URL, {
+    const response = await axios.get(apiUrl, {
       headers: {
-        'X-AC-Auth-Token': API_KEY,
-        'Accept': 'application/json'
+        "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
+        "Accept": "application/json"
       }
     });
 
@@ -17,10 +19,10 @@ exports.handler = async function(event, context) {
       body: JSON.stringify(response.data)
     };
   } catch (error) {
-    console.error('Error fetching products:', error.response?.data || error.message);
+    console.error("API request failed:", error.message);
     return {
-      statusCode: error.response?.status || 500,
-      body: JSON.stringify({ error: 'Failed to fetch products' })
+      statusCode: 500,
+      body: JSON.stringify({ error: "Failed to fetch product data." })
     };
   }
 };
