@@ -1,0 +1,9 @@
+{
+  "name": "mindkits-api",
+  "version": "1.0.0",
+  "description": "Middleware for getProducts endpoint",
+  "main": "netlify/functions/get-products.js",
+  "dependencies": {
+    "axios": "^1.6.8"
+  }
+}
