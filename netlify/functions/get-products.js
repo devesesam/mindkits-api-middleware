@@ -7,10 +7,9 @@ exports.handler = async function(event, context) {
   try {
     const { keywords = '', per_page = 100, page = 1 } = event.queryStringParameters || {};
 
-    // Construct query string using Cart.com filtering syntax
     const query = new URLSearchParams({
-      'per_page': per_page,
-      'page': page
+      per_page,
+      page
     });
 
     if (keywords) {
@@ -18,7 +17,6 @@ exports.handler = async function(event, context) {
     }
 
     const url = `${API_BASE_URL}/products?${query.toString()}`;
-    console.log('Final API Request URL:', url); // ✅ Debug output
 
     const response = await axios.get(url, {
       headers: {
@@ -27,9 +25,14 @@ exports.handler = async function(event, context) {
       }
     });
 
+    // 🐛 DEBUG: Include final request URL in the output
     return {
       statusCode: 200,
-      body: JSON.stringify(response.data)
+      body: JSON.stringify({
+        debug_url: url,
+        total_count: response.data.total_count,
+        products: response.data.products
+      })
     };
   } catch (error) {
     return {
