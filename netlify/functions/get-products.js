@@ -8,12 +8,15 @@ exports.handler = async function(event, context) {
     const { keywords = '', per_page = 100, page = 1 } = event.queryStringParameters || {};
 
     const query = new URLSearchParams({
-      [`filters[item_name][contains]`]: keywords,
+      'filters[item_name][contains]': keywords,
       per_page,
       page
     }).toString();
 
     const url = `${API_BASE_URL}/products?${query}`;
+
+    // Log the final URL for debugging
+    console.log("Final URL:", url);
 
     const response = await axios.get(url, {
       headers: {
@@ -27,6 +30,7 @@ exports.handler = async function(event, context) {
       body: JSON.stringify(response.data)
     };
   } catch (error) {
+    console.error("API error:", error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })
