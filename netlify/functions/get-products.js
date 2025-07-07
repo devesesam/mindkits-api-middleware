@@ -1,46 +1,42 @@
 const axios = require("axios");
 
+const API_URL = "https://www.mindkits.co.nz/api/v1/products";
+const API_KEY = "5ff793a4072fc4482937a02cfbd802a6";
+const MAX_PAGES = 5; // Limit to 5 pages to avoid timeout
+
 exports.handler = async function (event, context) {
-  const keyword = event.queryStringParameters.keywords || "";
-  const apiUrl = `https://www.mindkits.co.nz/api/v1/products`;
-  const perPage = 100;
+  const keyword = (event.queryStringParameters.keywords || "").toLowerCase();
+
   let allProducts = [];
-  let page = 1;
-  let morePages = true;
 
   try {
-    // ⏳ Fetch all pages
-    while (morePages) {
-      const response = await axios.get(apiUrl, {
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const response = await axios.get(API_URL, {
         headers: {
-          "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
+          "X-AC-Auth-Token": API_KEY,
           "Accept": "application/json"
         },
         params: {
-          per_page: perPage,
-          page: page
+          page,
+          per_page: 100
         }
       });
 
-      const products = response.data.products || [];
-      allProducts = allProducts.concat(products);
+      const pageProducts = response.data.products || [];
+      allProducts = allProducts.concat(pageProducts);
 
-      const nextPageUrl = response.data.next_page;
-      morePages = !!nextPageUrl;
-      page += 1;
+      // Stop if we reach the last page
+      if (pageProducts.length < 100) break;
     }
 
-    // 🔍 Filter manually by multiple fields
-    const lowerKeyword = keyword.toLowerCase();
+    // Filter products by keyword match in item_name, short_description, or long_description_1
     const filtered = keyword
       ? allProducts.filter(p => {
-          const searchableText = (
-            (p.item_name || "") +
-            (p.keywords || "") +
-            (p.short_description || "") +
-            (p.long_description_1 || "")
-          ).toLowerCase();
-          return searchableText.includes(lowerKeyword);
+          return (
+            (p.item_name || "").toLowerCase().includes(keyword) ||
+            (p.short_description || "").toLowerCase().includes(keyword) ||
+            (p.long_description_1 || "").toLowerCase().includes(keyword)
+          );
         })
       : allProducts;
 
