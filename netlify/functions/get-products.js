@@ -1,42 +1,47 @@
 const axios = require("axios");
 
-const API_URL = "https://www.mindkits.co.nz/api/v1/products";
-const API_KEY = "5ff793a4072fc4482937a02cfbd802a6";
-const MAX_PAGES = 5; // Limit to 5 pages to avoid timeout
-
 exports.handler = async function (event, context) {
-  const keyword = (event.queryStringParameters.keywords || "").toLowerCase();
+  let keyword = "";
 
-  let allProducts = [];
+  if (event.httpMethod === "POST" && event.body) {
+    const body = JSON.parse(event.body);
+    keyword = body.search || "";
+  } else {
+    keyword = event.queryStringParameters.keywords || "";
+  }
+
+  const apiUrl = `https://www.mindkits.co.nz/api/v1/products`;
+  const allProducts = [];
+  const maxPages = 5;
 
   try {
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      const response = await axios.get(API_URL, {
+    for (let page = 1; page <= maxPages; page++) {
+      const response = await axios.get(apiUrl, {
         headers: {
-          "X-AC-Auth-Token": API_KEY,
+          "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
           "Accept": "application/json"
         },
         params: {
-          page,
-          per_page: 100
+          per_page: 100,
+          page
         }
       });
 
-      const pageProducts = response.data.products || [];
-      allProducts = allProducts.concat(pageProducts);
-
-      // Stop if we reach the last page
-      if (pageProducts.length < 100) break;
+      if (response.data && response.data.products) {
+        allProducts.push(...response.data.products);
+        if (!response.data.products.length) break;
+      } else {
+        break;
+      }
     }
 
-    // Filter products by keyword match in item_name, short_description, or long_description_1
     const filtered = keyword
       ? allProducts.filter(p => {
-          return (
-            (p.item_name || "").toLowerCase().includes(keyword) ||
-            (p.short_description || "").toLowerCase().includes(keyword) ||
-            (p.long_description_1 || "").toLowerCase().includes(keyword)
-          );
+          const name = (p.item_name || "").toLowerCase();
+          const short = (p.short_description || "").toLowerCase();
+          const long = (p.long_description_1 || "").toLowerCase();
+          const key = keyword.toLowerCase();
+          return name.includes(key) || short.includes(key) || long.includes(key);
         })
       : allProducts;
 
