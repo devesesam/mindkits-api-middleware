@@ -1,40 +1,36 @@
-const axios = require('axios');
+const axios = require("axios");
 
-const API_BASE_URL = 'https://www.mindkits.co.nz/api/v1';
-const API_KEY = '5ff793a4072fc4482937a02cfbd802a6';
-
-exports.handler = async function(event, context) {
+exports.handler = async function (event, context) {
+  const keyword = event.queryStringParameters.keywords || "";
+  const apiUrl = `https://www.mindkits.co.nz/api/v1/products`;
+  
   try {
-    const { keywords = '', per_page = 100, page = 1 } = event.queryStringParameters || {};
-
-    const query = new URLSearchParams({
-      per_page,
-      page
-    });
-
-    if (keywords) {
-      query.append('filters[item_name][contains]', keywords);
-    }
-
-    const url = `${API_BASE_URL}/products?${query.toString()}`;
-
-    const response = await axios.get(url, {
+    const response = await axios.get(apiUrl, {
       headers: {
-        'X-AC-Auth-Token': API_KEY,
-        'Accept': 'application/json'
+        "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
+        "Accept": "application/json"
       }
     });
 
-    // 🐛 DEBUG: Include final request URL in the output
+    const products = response.data.products || [];
+
+    // 🔍 Filter manually
+    const filtered = keyword
+      ? products.filter(p =>
+          (p.item_name || "").toLowerCase().includes(keyword.toLowerCase())
+        )
+      : products;
+
     return {
       statusCode: 200,
       body: JSON.stringify({
-        debug_url: url,
-        total_count: response.data.total_count,
-        products: response.data.products
+        total_count: filtered.length,
+        products: filtered
       })
     };
+
   } catch (error) {
+    console.error("API request failed:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })
