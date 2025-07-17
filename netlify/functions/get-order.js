@@ -1,7 +1,10 @@
 const axios = require("axios");
 
 exports.handler = async function (event, context) {
-  console.info("==== Order Lookup Request ====");
+  console.info("==== Incoming Request ====");
+  console.info("HTTP Method:", event.httpMethod);
+  console.info("Request Body:", event.body);
+  console.info("==========================");
 
   if (event.httpMethod !== "POST") {
     return {
@@ -48,6 +51,7 @@ exports.handler = async function (event, context) {
 
     const orders = orderRes.data.orders || [];
     if (orders.length === 0) {
+      console.warn(`Order not found: ${orderNumber}`);
       return {
         statusCode: 404,
         body: JSON.stringify({ error: "Order not found" }),
@@ -63,8 +67,12 @@ exports.handler = async function (event, context) {
       is_shipped: !!status.is_shipped,
       is_cancelled: !!status.is_cancelled,
       ordered_at: order.ordered_at || null,
-      tracking_url: order.tracking_url || null // Replace with actual field if different
+      tracking_url: order.tracking_url || null // update if needed
     };
+
+    console.info("==== Response Body ====");
+    console.info(JSON.stringify(result, null, 2));
+    console.info("=======================");
 
     return {
       statusCode: 200,
