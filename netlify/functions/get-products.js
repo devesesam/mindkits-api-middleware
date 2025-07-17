@@ -52,7 +52,6 @@ exports.handler = async function (event, context) {
 
         if (products.length < 100) break;
 
-        // Optional: Stop early if approaching timeout (safety buffer)
         const elapsed = Date.now() - startTime;
         if (elapsed > 8000) {
           console.warn("Stopping early to avoid timeout");
@@ -65,20 +64,30 @@ exports.handler = async function (event, context) {
       }
     }
 
-    // Enhanced multi-word keyword filtering
-    const filtered = keyword
-      ? allProducts.filter((p) => {
-          const fields = [p.item_name, p.short_description, p.long_description_1]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
+    const keywords = keyword.toLowerCase().split(/\s+/);
 
-          const keywords = keyword.toLowerCase().split(/\s+/);
-          return keywords.every((word) => fields.includes(word));
-        })
-      : allProducts;
+    const scored = allProducts
+      .map((p) => {
+        const title = (p.item_name || "").toLowerCase();
+        const short = (p.short_description || "").toLowerCase();
+        const long = (p.long_description_1 || "").toLowerCase();
 
-    const simplified = filtered.map((p) => {
+        let score = 0;
+
+        for (const word of keywords) {
+          if (title.includes(word)) score += 3;
+          if (title.startsWith(word)) score += 2;
+          if (short.includes(word)) score += 1;
+          if (long.includes(word)) score += 0.5;
+        }
+
+        return { product: p, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(({ product }) => product);
+
+    const simplified = scored.map((p) => {
       const product = {
         title: p.item_name,
         price: p.price,
@@ -92,7 +101,7 @@ exports.handler = async function (event, context) {
 
     const responseBody = {
       total_count: simplified.length,
-      products: simplified,
+      products: simplified.slice(0, 10),
     };
 
     console.info("==== Response Body ====");
