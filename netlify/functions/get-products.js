@@ -47,14 +47,18 @@ exports.handler = async function (event, context) {
       if (products.length < 100) break;
     }
 
+    // Enhanced multi-word filtering logic
     const filtered = keyword
-      ? allProducts.filter((p) =>
-          [p.item_name, p.short_description, p.long_description_1]
+      ? allProducts.filter((p) => {
+          const fields = [p.item_name, p.short_description, p.long_description_1]
             .filter(Boolean)
-            .some((field) =>
-              field.toLowerCase().includes(keyword.toLowerCase())
-            )
-        )
+            .join(" ")
+            .toLowerCase();
+
+          const keywords = keyword.toLowerCase().split(/\s+/); // split into words
+
+          return keywords.every((word) => fields.includes(word));
+        })
       : allProducts;
 
     const simplified = filtered.map((p) => {
