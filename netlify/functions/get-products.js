@@ -29,25 +29,43 @@ exports.handler = async function (event, context) {
   const allProducts = [];
 
   try {
-    for (let page = 1; page <= 5; page++) {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
-          "Accept": "application/json",
-        },
-        params: {
-          per_page: 100,
-          page,
-        },
-      });
+    const startTime = Date.now();
+    const maxPages = 20;
 
-      const products = response.data.products || [];
-      allProducts.push(...products);
+    for (let page = 1; page <= maxPages; page++) {
+      try {
+        const response = await axios.get(apiUrl, {
+          headers: {
+            "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
+            Accept: "application/json",
+          },
+          params: {
+            per_page: 100,
+            page,
+          },
+        });
 
-      if (products.length < 100) break;
+        const products = response.data.products || [];
+        allProducts.push(...products);
+
+        console.info(`Fetched page ${page}, ${products.length} products`);
+
+        if (products.length < 100) break;
+
+        // Optional: Stop early if approaching timeout (safety buffer)
+        const elapsed = Date.now() - startTime;
+        if (elapsed > 8000) {
+          console.warn("Stopping early to avoid timeout");
+          break;
+        }
+
+      } catch (err) {
+        console.warn(`Failed to fetch page ${page}: ${err.message}`);
+        break;
+      }
     }
 
-    // Enhanced multi-word filtering logic
+    // Enhanced multi-word keyword filtering
     const filtered = keyword
       ? allProducts.filter((p) => {
           const fields = [p.item_name, p.short_description, p.long_description_1]
@@ -55,8 +73,7 @@ exports.handler = async function (event, context) {
             .join(" ")
             .toLowerCase();
 
-          const keywords = keyword.toLowerCase().split(/\s+/); // split into words
-
+          const keywords = keyword.toLowerCase().split(/\s+/);
           return keywords.every((word) => fields.includes(word));
         })
       : allProducts;
@@ -68,7 +85,6 @@ exports.handler = async function (event, context) {
         url: `https://www.mindkits.co.nz${p.url_rewrite}`,
       };
 
-      // Only include non-empty values
       return Object.fromEntries(
         Object.entries(product).filter(([_, value]) => value !== "" && value !== null)
       );
