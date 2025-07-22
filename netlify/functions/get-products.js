@@ -32,42 +32,72 @@ exports.handler = async function (event, context) {
     };
   }
 
-  // Convert search term to ANDed like filters
-  const terms = keyword
+  const searchTerms = keyword
     .toLowerCase()
     .split(/\s+/)
-    .filter((word) => word.length > 0)
-    .map((word) => `like:${word}`);
-  const itemNameFilter = terms.join("+AND+");
+    .filter((w) => w.length > 0)
+    .map((w) => `like:${w}`)
+    .join("+AND+");
 
   const apiUrl = `https://www.mindkits.co.nz/api/v1/products`;
-  const perPage = 10;
+  const allProducts = [];
+  const perPage = 100;
+  let page = 1;
 
-  console.info(`Querying Cart.com with: item_name=${itemNameFilter}`);
+  console.info(`Querying Cart.com with: item_name=${searchTerms}`);
 
   try {
-    const response = await axios.get(apiUrl, {
-      headers: {
-        "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
-        Accept: "application/json",
-      },
-      params: {
-        item_name: itemNameFilter,
-        per_page: perPage,
-        page: 1,
-      },
-    });
+    while (true) {
+      const response = await axios.get(apiUrl, {
+        headers: {
+          "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
+          Accept: "application/json",
+        },
+        params: {
+          item_name: searchTerms,
+          per_page: perPage,
+          page,
+        },
+      });
 
-    const data = response.data.products || [];
+      const products = response.data.products || [];
+      allProducts.push(...products);
 
-    const simplified = data.map((p) => ({
+      console.info(`Fetched page ${page}, ${products.length} products`);
+
+      if (products.length < perPage) break;
+      page++;
+    }
+
+    const keywords = keyword.toLowerCase().split(/\s+/);
+    const scored = allProducts
+      .map((p) => {
+        const title = (p.item_name || "").toLowerCase();
+        const short = (p.short_description || "").toLowerCase();
+        const long = (p.long_description_1 || "").toLowerCase();
+
+        let score = 0;
+        for (const word of keywords) {
+          if (title.includes(word)) score += 3;
+          if (title.startsWith(word)) score += 2;
+          if (short.includes(word)) score += 1;
+          if (long.includes(word)) score += 0.5;
+        }
+
+        return { product: p, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(({ product }) => product);
+
+    const simplified = scored.slice(0, 10).map((p) => ({
       title: p.item_name,
       price: p.price,
       url: `https://www.mindkits.co.nz${p.url_rewrite}`,
     }));
 
     const responseBody = {
-      total_count: data.length,
+      total_count: scored.length,
       products: simplified,
     };
 
