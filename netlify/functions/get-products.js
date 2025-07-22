@@ -32,45 +32,42 @@ exports.handler = async function (event, context) {
     };
   }
 
+  // Convert search term to ANDed like filters
+  const terms = keyword
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => word.length > 0)
+    .map((word) => `like:${word}`);
+  const itemNameFilter = terms.join("+AND+");
+
   const apiUrl = `https://www.mindkits.co.nz/api/v1/products`;
-  const products = [];
+  const perPage = 10;
+
+  console.info(`Querying Cart.com with: item_name=${itemNameFilter}`);
 
   try {
-    let page = 1;
-    const perPage = 100;
-
-    while (true) {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
-          Accept: "application/json",
-        },
-        params: {
-          item_name: `like:${keyword}`,
-          per_page: perPage,
-          page,
-        },
-      });
-
-      const data = response.data.products || [];
-      products.push(...data);
-
-      console.info(`Fetched page ${page}, ${data.length} products`);
-
-      if (data.length < perPage || products.length >= 500) break;
-      page++;
-    }
-
-    const simplified = products.slice(0, 10).map((p) => {
-      return {
-        title: p.item_name,
-        price: p.price,
-        url: `https://www.mindkits.co.nz${p.url_rewrite}`,
-      };
+    const response = await axios.get(apiUrl, {
+      headers: {
+        "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
+        Accept: "application/json",
+      },
+      params: {
+        item_name: itemNameFilter,
+        per_page: perPage,
+        page: 1,
+      },
     });
 
+    const data = response.data.products || [];
+
+    const simplified = data.map((p) => ({
+      title: p.item_name,
+      price: p.price,
+      url: `https://www.mindkits.co.nz${p.url_rewrite}`,
+    }));
+
     const responseBody = {
-      total_count: products.length,
+      total_count: data.length,
       products: simplified,
     };
 
