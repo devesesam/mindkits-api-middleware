@@ -36,20 +36,12 @@ exports.handler = async function (event, context) {
   };
 
   try {
-    // Step 1: Get order_statuses to map ID to name
-    const statusRes = await axios.get("https://www.mindkits.co.nz/api/v1/order_statuses", { headers });
-    const statusMap = {};
-    for (const s of statusRes.data.order_statuses || []) {
-      statusMap[s.id] = s;
-    }
-
-    // Step 2: Lookup order by order_number
-    const orderRes = await axios.get("https://www.mindkits.co.nz/api/v1/orders", {
+    const response = await axios.get("https://www.mindkits.co.nz/api/v1/orders", {
       headers,
       params: { order_number: orderNumber },
     });
 
-    const orders = orderRes.data.orders || [];
+    const orders = response.data.orders || [];
     if (orders.length === 0) {
       console.warn(`Order not found: ${orderNumber}`);
       return {
@@ -59,15 +51,18 @@ exports.handler = async function (event, context) {
     }
 
     const order = orders[0];
-    const status = statusMap[order.order_status_id] || {};
+    const items = order.items?.map((item) => ({
+      name: item.item_name,
+      quantity: item.quantity,
+      price: item.price,
+    })) || [];
 
     const result = {
       order_number: order.order_number,
-      status_name: status.name || "Unknown",
-      is_shipped: !!status.is_shipped,
-      is_cancelled: !!status.is_cancelled,
-      ordered_at: order.ordered_at || null,
-      tracking_url: order.tracking_url || null // update if needed
+      ordered_at: order.ordered_at,
+      total: order.grand_total,
+      shipping_method: order.selected_shipping_method,
+      items: items,
     };
 
     console.info("==== Response Body ====");
