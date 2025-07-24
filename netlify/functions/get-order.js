@@ -13,11 +13,11 @@ exports.handler = async function (event, context) {
     };
   }
 
-  let orderNumber = "";
+  let orderId = "";
   try {
     const body = JSON.parse(event.body || "{}");
-    orderNumber = body.order_number?.trim();
-    if (!orderNumber) {
+    orderId = body.order_number?.trim(); // Tawk sends 'order_number', but it's actually the order ID we need
+    if (!orderId) {
       return {
         statusCode: 400,
         body: JSON.stringify({ error: "Missing order_number" }),
@@ -38,12 +38,12 @@ exports.handler = async function (event, context) {
   try {
     const response = await axios.get("https://www.mindkits.co.nz/api/v1/orders", {
       headers,
-      params: { order_number: orderNumber },
+      params: { id: orderId },
     });
 
     const orders = response.data.orders || [];
     if (orders.length === 0) {
-      console.warn(`Order not found: ${orderNumber}`);
+      console.warn(`Order not found: ${orderId}`);
       return {
         statusCode: 404,
         body: JSON.stringify({ error: "Order not found" }),
@@ -51,18 +51,18 @@ exports.handler = async function (event, context) {
     }
 
     const order = orders[0];
-    const items = order.items?.map((item) => ({
+    const items = (order.items || []).map((item) => ({
       name: item.item_name,
       quantity: item.quantity,
       price: item.price,
-    })) || [];
+    }));
 
     const result = {
-      order_number: order.order_number,
+      order_id: order.id,
       ordered_at: order.ordered_at,
       total: order.grand_total,
       shipping_method: order.selected_shipping_method,
-      items: items,
+      items,
     };
 
     console.info("==== Response Body ====");
