@@ -16,7 +16,7 @@ exports.handler = async function (event, context) {
   let orderId = "";
   try {
     const body = JSON.parse(event.body || "{}");
-    orderId = body.order_number?.trim(); // Tawk sends 'order_number', but it's actually the order ID we need
+    orderId = body.order_number?.trim(); // Tawk sends 'order_number', but it's actually the order ID
     if (!orderId) {
       return {
         statusCode: 400,
@@ -35,10 +35,16 @@ exports.handler = async function (event, context) {
     Accept: "application/json",
   };
 
+  const currentYear = new Date().getFullYear();
+  const dateFilter = `gte:${currentYear - 1}-01-01+AND+lte:${currentYear + 1}-12-31`;
+
   try {
     const response = await axios.get("https://www.mindkits.co.nz/api/v1/orders", {
       headers,
-      params: { id: orderId },
+      params: {
+        id: orderId,
+        ordered_at: dateFilter,
+      },
     });
 
     const orders = response.data.orders || [];
@@ -57,11 +63,19 @@ exports.handler = async function (event, context) {
       price: item.price,
     }));
 
+    // Fetch order status mapping
+    const statusRes = await axios.get("https://www.mindkits.co.nz/api/v1/order_statuses", { headers });
+    const statusMap = {};
+    for (const s of statusRes.data.order_statuses || []) {
+      statusMap[s.id] = s.name;
+    }
+
     const result = {
       order_id: order.id,
       ordered_at: order.ordered_at,
       total: order.grand_total,
       shipping_method: order.selected_shipping_method,
+      order_status: statusMap[order.order_status_id] || "Unknown",
       items,
     };
 
