@@ -16,7 +16,7 @@ exports.handler = async function (event, context) {
   let orderId = "";
   try {
     const body = JSON.parse(event.body || "{}");
-    orderId = body.order_number?.trim(); // Tawk sends 'order_number', but it's actually the order ID
+    orderId = body.order_number?.trim(); // Still coming from Tawk as 'order_number'
     if (!orderId) {
       return {
         statusCode: 400,
@@ -35,19 +35,14 @@ exports.handler = async function (event, context) {
     Accept: "application/json",
   };
 
-  const currentYear = new Date().getFullYear();
-  const dateFilter = `gte:${currentYear - 1}-01-01+AND+lte:${currentYear + 1}-12-31`;
-
   try {
-    const response = await axios.get("https://www.mindkits.co.nz/api/v1/orders", {
+    // Fetch the order using its ID
+    const orderRes = await axios.get("https://www.mindkits.co.nz/api/v1/orders", {
       headers,
-      params: {
-        id: orderId,
-        ordered_at: dateFilter,
-      },
+      params: { id: orderId },
     });
 
-    const orders = response.data.orders || [];
+    const orders = orderRes.data.orders || [];
     if (orders.length === 0) {
       console.warn(`Order not found: ${orderId}`);
       return {
@@ -57,25 +52,33 @@ exports.handler = async function (event, context) {
     }
 
     const order = orders[0];
+
+    // Fetch all order statuses
+    const statusRes = await axios.get("https://www.mindkits.co.nz/api/v1/order_statuses", {
+      headers,
+    });
+
+    const statusMap = {};
+    for (const status of statusRes.data.order_statuses || []) {
+      statusMap[status.id] = status;
+    }
+
+    const matchedStatus = statusMap[order.order_status_id] || {};
+
     const items = (order.items || []).map((item) => ({
       name: item.item_name,
       quantity: item.quantity,
       price: item.price,
     }));
 
-    // Fetch order status mapping
-    const statusRes = await axios.get("https://www.mindkits.co.nz/api/v1/order_statuses", { headers });
-    const statusMap = {};
-    for (const s of statusRes.data.order_statuses || []) {
-      statusMap[s.id] = s.name;
-    }
-
     const result = {
       order_id: order.id,
       ordered_at: order.ordered_at,
       total: order.grand_total,
       shipping_method: order.selected_shipping_method,
-      order_status: statusMap[order.order_status_id] || "Unknown",
+      status_name: matchedStatus.name || "Unknown",
+      is_shipped: !!matchedStatus.is_shipped,
+      is_cancelled: !!matchedStatus.is_cancelled,
       items,
     };
 
