@@ -58,14 +58,33 @@ exports.handler = async function (event, context) {
           item_name: searchTerms,
           per_page: perPage,
           page,
-          // >>> Added exact Cart.com filters <<<
-          is_enabled: true,
-          is_hidden: false,
-          is_discontinued: 0,
+          // >>> Filters added with tenant-friendly types <<<
+          is_enabled: true,   // boolean
+          is_hidden: 0,       // number (0/1)
+          is_discontinued: 0, // number (0/1)
         },
+        timeout: 10000,
+        validateStatus: () => true, // don't throw; we'll inspect status below
       });
 
-      const products = response.data.products || [];
+      if (response.status < 200 || response.status >= 300) {
+        const snippet =
+          typeof response.data === "string"
+            ? response.data.slice(0, 300)
+            : JSON.stringify(response.data || {}).slice(0, 300);
+        console.error(
+          `Upstream returned ${response.status}. Body snippet: ${snippet}`
+        );
+        return {
+          statusCode: 502,
+          body: JSON.stringify({ error: "Upstream error", status: response.status }),
+        };
+      }
+
+      const products =
+        (response.data && response.data.products) ||
+        (response.data && response.data.data) ||
+        [];
       allProducts.push(...products);
 
       console.info(`Fetched page ${page}, ${products.length} products`);
