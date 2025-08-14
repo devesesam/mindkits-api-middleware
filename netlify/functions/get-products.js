@@ -13,10 +13,16 @@ exports.handler = async function (event, context) {
     };
   }
 
-  let query = "";
+  let search = "";
   try {
     const body = JSON.parse(event.body || "{}");
-    query = body.search?.trim() || "";
+    search = (body.search || "").trim();
+    if (!search) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Missing search term" }),
+      };
+    }
   } catch (err) {
     return {
       statusCode: 400,
@@ -29,65 +35,66 @@ exports.handler = async function (event, context) {
     Accept: "application/json",
   };
 
-  const baseUrl = "https://www.mindkits.co.nz/api/v1/products";
-  let allProducts = [];
+  const allProducts = [];
   let page = 1;
-  const limit = 100;
+  const pageSize = 100;
 
   try {
-    // Keep fetching until no more products are returned
+    // Fetch all products page by page
     while (true) {
-      const res = await axios.get(baseUrl, {
+      const res = await axios.get("https://www.mindkits.co.nz/api/v1/products", {
         headers,
         params: {
-          is_enabled: true,
-          limit,
           page,
+          limit: pageSize,
+          is_enabled: true,
+          is_hidden: false,
+          is_discontinued: false,
         },
       });
 
       const products = res.data.products || [];
       if (products.length === 0) break;
 
-      allProducts = allProducts.concat(products);
-      page++;
+      allProducts.push(...products);
+      if (products.length < pageSize) break;
+
+      page += 1;
     }
 
-    // Apply filters to remove hidden or discontinued products
-    const filtered = allProducts.filter(p =>
-      p.is_enabled === true &&
-      p.is_hidden !== 1 &&
-      p.is_discontinued !== true
-    );
+    // Ranking logic based on search term
+    const ranked = allProducts
+      .map((product) => {
+        const name = product.item_name || "";
+        const keywords = product.keywords || "";
+        const desc = product.long_description_1 || "";
+        const combined = `${name} ${keywords} ${desc}`.toLowerCase();
+        const score = combined.includes(search.toLowerCase()) ? 1 : 0;
 
-    // If a search query was provided, rank by relevance
-    let results = filtered;
-    if (query) {
-      const q = query.toLowerCase();
-      results = filtered
-        .map((product) => {
-          const name = product.item_name?.toLowerCase() || "";
-          const description = product.long_description_1?.toLowerCase() || "";
-          const keywords = product.keywords?.toLowerCase() || "";
-          const itemNumber = product.item_number?.toLowerCase() || "";
+        // Simple score boost for name matches
+        if (name.toLowerCase().includes(search.toLowerCase())) {
+          return { product, score: score + 2 };
+        }
 
-          let score = 0;
-          if (name.includes(q)) score += 3;
-          if (description.includes(q)) score += 2;
-          if (keywords.includes(q)) score += 1;
-          if (itemNumber === q) score += 5;
-
-          return { ...product, relevanceScore: score };
-        })
-        .filter(p => p.relevanceScore > 0)
-        .sort((a, b) => b.relevanceScore - a.relevanceScore)
-        .slice(0, 10); // Top 10 results
-    }
+        return { product, score };
+      })
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10) // top 10 results
+      .map(({ product }) => ({
+        id: product.id,
+        name: product.item_name,
+        price: product.price,
+        item_number: product.item_number,
+        quantity_on_hand: product.quantity_on_hand,
+        long_description: product.long_description_1,
+        url: product.url_rewrite,
+      }));
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(results),
+      body: JSON.stringify(ranked),
     };
   } catch (err) {
     console.error("Product lookup failed:", err.message);
