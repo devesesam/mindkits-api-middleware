@@ -3,120 +3,52 @@ const axios = require("axios");
 exports.handler = async function (event, context) {
   console.info("==== Incoming Request ====");
   console.info("HTTP Method:", event.httpMethod);
-  console.info("Query String Parameters:", event.queryStringParameters);
   console.info("Request Body:", event.body);
   console.info("==========================");
 
-  if (event.httpMethod !== "POST") {
+  if (event.httpMethod !== "GET") {
     return {
       statusCode: 405,
       body: JSON.stringify({ error: "Method Not Allowed" }),
     };
   }
 
-  let keyword = "";
-  try {
-    const body = JSON.parse(event.body || "{}");
-    keyword = body.search || "";
-  } catch (err) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Invalid JSON body" }),
-    };
-  }
-
-  if (!keyword) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Missing search keyword" }),
-    };
-  }
-
-  const searchTerms = keyword
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 0)
-    .map((w) => `like:${w}`)
-    .join("+AND+");
-
-  const apiUrl = `https://www.mindkits.co.nz/api/v1/products`;
-  const allProducts = [];
-  const perPage = 100;
-  let page = 1;
-
-  console.info(`Querying Cart.com with: item_name=${searchTerms}`);
+  const headers = {
+    "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
+    Accept: "application/json",
+  };
 
   try {
-    while (true) {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          "X-AC-Auth-Token": "5ff793a4072fc4482937a02cfbd802a6",
-          Accept: "application/json",
-        },
-        params: {
-          item_name: searchTerms,
-          per_page: perPage,
-          page,
-        },
-      });
+    const response = await axios.get("https://www.mindkits.co.nz/api/v1/products", {
+      headers,
+    });
 
-      const products = response.data.products || [];
-      allProducts.push(...products);
+    const products = (response.data.products || []).filter((product) => {
+      return product.is_enabled === true;
+    });
 
-      console.info(`Fetched page ${page}, ${products.length} products`);
-
-      if (products.length < perPage) break;
-      page++;
-    }
-
-    const keywords = keyword.toLowerCase().split(/\s+/);
-    const scored = allProducts
-      .map((p) => {
-        const title = (p.item_name || "").toLowerCase();
-        const short = (p.short_description || "").toLowerCase();
-        const long = (p.long_description_1 || "").toLowerCase();
-
-        let score = 0;
-        for (const word of keywords) {
-          if (title.includes(word)) score += 3;
-          if (title.startsWith(word)) score += 2;
-          if (short.includes(word)) score += 1;
-          if (long.includes(word)) score += 0.5;
-        }
-
-        return { product: p, score };
-      })
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map(({ product }) => product);
-
-    const simplified = scored.slice(0, 10).map((p) => ({
-      title: p.item_name,
-      price: p.price,
-      url: `https://www.mindkits.co.nz${p.url_rewrite}`,
+    const result = products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      price: product.price,
+      inventory: product.inventory_level,
     }));
 
-    const responseBody = {
-      total_count: scored.length,
-      products: simplified,
-    };
-
-    console.info("==== Response Body ====");
-    console.info(JSON.stringify(responseBody, null, 2));
-    console.info("=======================");
+    console.info("==== Filtered Products ====");
+    console.info(JSON.stringify(result, null, 2));
+    console.info("===========================");
 
     return {
       statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(responseBody),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(result),
     };
-  } catch (error) {
-    console.error("API request failed:", error.message);
+  } catch (err) {
+    console.error("Product lookup failed:", err.message);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
+      body: JSON.stringify({ error: "Product lookup failed" }),
     };
   }
 };
