@@ -40,16 +40,16 @@ exports.handler = async function (event, context) {
   const pageSize = 100;
 
   try {
-    // Fetch all products page by page
+    // Fetch all pages of filtered products
     while (true) {
       const res = await axios.get("https://www.mindkits.co.nz/api/v1/products", {
         headers,
         params: {
           page,
           limit: pageSize,
-          is_enabled: true,
-          is_hidden: false,
-          is_discontinued: false,
+          is_enabled: true,       // boolean
+          is_hidden: 0,           // integer
+          is_discontinued: false, // boolean
         },
       });
 
@@ -62,7 +62,7 @@ exports.handler = async function (event, context) {
       page += 1;
     }
 
-    // Ranking logic based on search term
+    // Score and rank products
     const ranked = allProducts
       .map((product) => {
         const name = product.item_name || "";
@@ -71,7 +71,6 @@ exports.handler = async function (event, context) {
         const combined = `${name} ${keywords} ${desc}`.toLowerCase();
         const score = combined.includes(search.toLowerCase()) ? 1 : 0;
 
-        // Simple score boost for name matches
         if (name.toLowerCase().includes(search.toLowerCase())) {
           return { product, score: score + 2 };
         }
@@ -80,7 +79,7 @@ exports.handler = async function (event, context) {
       })
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 10) // top 10 results
+      .slice(0, 10)
       .map(({ product }) => ({
         id: product.id,
         name: product.item_name,
