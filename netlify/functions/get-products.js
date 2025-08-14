@@ -3,7 +3,7 @@ const axios = require("axios");
 exports.handler = async function (event, context) {
   console.info("==== Incoming Request ====");
   console.info("HTTP Method:", event.httpMethod);
-  console.info("Request Body:", event.body);
+  console.info("Raw Body:", event.body);
   console.info("==========================");
 
   if (event.httpMethod !== "POST") {
@@ -16,7 +16,9 @@ exports.handler = async function (event, context) {
   let search = "";
   try {
     const body = JSON.parse(event.body || "{}");
+    console.info("Parsed Body:", JSON.stringify(body, null, 2));
     search = (body.search || "").trim();
+
     if (!search) {
       return {
         statusCode: 400,
@@ -24,6 +26,7 @@ exports.handler = async function (event, context) {
       };
     }
   } catch (err) {
+    console.error("JSON parsing error:", err.message);
     return {
       statusCode: 400,
       body: JSON.stringify({ error: "Invalid JSON body" }),
@@ -40,16 +43,15 @@ exports.handler = async function (event, context) {
   const pageSize = 100;
 
   try {
-    // Fetch all pages of filtered products
     while (true) {
       const res = await axios.get("https://www.mindkits.co.nz/api/v1/products", {
         headers,
         params: {
           page,
           limit: pageSize,
-          is_enabled: true,       // boolean
+          is_enabled: true,
           is_hidden: 0,           // integer
-          is_discontinued: false, // boolean
+          is_discontinued: false  // boolean
         },
       });
 
@@ -62,18 +64,17 @@ exports.handler = async function (event, context) {
       page += 1;
     }
 
-    // Score and rank products
     const ranked = allProducts
       .map((product) => {
         const name = product.item_name || "";
         const keywords = product.keywords || "";
         const desc = product.long_description_1 || "";
         const combined = `${name} ${keywords} ${desc}`.toLowerCase();
-        const score = combined.includes(search.toLowerCase()) ? 1 : 0;
+        const searchTerm = search.toLowerCase();
 
-        if (name.toLowerCase().includes(search.toLowerCase())) {
-          return { product, score: score + 2 };
-        }
+        let score = 0;
+        if (combined.includes(searchTerm)) score += 1;
+        if (name.toLowerCase().includes(searchTerm)) score += 2;
 
         return { product, score };
       })
@@ -89,6 +90,10 @@ exports.handler = async function (event, context) {
         long_description: product.long_description_1,
         url: product.url_rewrite,
       }));
+
+    console.info("==== Outgoing Response ====");
+    console.info(JSON.stringify(ranked, null, 2));
+    console.info("===========================");
 
     return {
       statusCode: 200,
