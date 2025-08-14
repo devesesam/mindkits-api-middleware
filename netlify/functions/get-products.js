@@ -1,3 +1,4 @@
+// netlify/functions/get-products.js
 const axios = require("axios");
 
 exports.handler = async function (event, context) {
@@ -57,6 +58,10 @@ exports.handler = async function (event, context) {
           item_name: searchTerms,
           per_page: perPage,
           page,
+          // >>> Added exact Cart.com filters <<<
+          is_enabled: true,
+          is_hidden: false,
+          is_discontinued: 0,
         },
       });
 
