@@ -1,6 +1,18 @@
 // netlify/functions/get-products.js
 const axios = require("axios");
 
+// tiny helper: strip HTML + collapse whitespace + optional trim
+function stripHtml(html = "", max = 800) {
+  const text = String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > max ? text.slice(0, max - 1) + "…" : text;
+}
+
 exports.handler = async function (event, context) {
   console.info("==== Incoming Request ====");
   console.info("HTTP Method:", event.httpMethod);
@@ -58,28 +70,8 @@ exports.handler = async function (event, context) {
           item_name: searchTerms,
           per_page: perPage,
           page,
-          // >>> Filters added with tenant-friendly types <<<
-          is_enabled: true,   // boolean
-          is_hidden: 0,       // number (0/1)
-          is_discontinued: 0, // number (0/1)
         },
-        timeout: 10000,
-        validateStatus: () => true, // don't throw; we'll inspect status below
       });
-
-      if (response.status < 200 || response.status >= 300) {
-        const snippet =
-          typeof response.data === "string"
-            ? response.data.slice(0, 300)
-            : JSON.stringify(response.data || {}).slice(0, 300);
-        console.error(
-          `Upstream returned ${response.status}. Body snippet: ${snippet}`
-        );
-        return {
-          statusCode: 502,
-          body: JSON.stringify({ error: "Upstream error", status: response.status }),
-        };
-      }
 
       const products =
         (response.data && response.data.products) ||
@@ -118,6 +110,8 @@ exports.handler = async function (event, context) {
       title: p.item_name,
       price: p.price,
       url: `https://www.mindkits.co.nz${p.url_rewrite}`,
+      // NEW: include long_description_1, HTML removed and trimmed
+      long_description_1: stripHtml(p.long_description_1),
     }));
 
     const responseBody = {
