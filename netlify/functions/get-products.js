@@ -108,7 +108,7 @@ exports.handler = async function (event, context) {
 
     const simplified = scored.slice(0, 5).map((p) => ({
       title: p.item_name,
-      price: p.price,
+      price: p.retail,
       url: `https://www.mindkits.co.nz${p.url_rewrite}`,
       // NEW: include long_description_1, HTML removed and trimmed
       long_description_1: stripHtml(p.long_description_1),
