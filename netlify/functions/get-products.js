@@ -2,7 +2,7 @@
 const axios = require("axios");
 
 // tiny helper: strip HTML + collapse whitespace + optional trim
-function stripHtml(html = "", max = 800) {
+function stripHtml(html = "", max = 500) {
   const text = String(html)
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -106,7 +106,7 @@ exports.handler = async function (event, context) {
       .sort((a, b) => b.score - a.score)
       .map(({ product }) => product);
 
-    const simplified = scored.slice(0, 10).map((p) => ({
+    const simplified = scored.slice(0, 5).map((p) => ({
       title: p.item_name,
       price: p.price,
       url: `https://www.mindkits.co.nz${p.url_rewrite}`,
