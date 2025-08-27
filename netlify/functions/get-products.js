@@ -108,7 +108,11 @@ exports.handler = async function (event, context) {
 
     const simplified = scored.slice(0, 5).map((p) => ({
       title: p.item_name,
-      price: p.retail, // as you currently send
+      // Use retail if present and > 0, otherwise fall back to standard price
+      price:
+        typeof p.retail === "number" && p.retail > 0
+          ? p.retail
+          : p.price,
       url: `https://www.mindkits.co.nz${p.url_rewrite}`,
       long_description_1: stripHtml(p.long_description_1),
       quantity_on_hand: Number.isFinite(p.quantity_on_hand) ? p.quantity_on_hand : null,
