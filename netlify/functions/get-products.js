@@ -108,10 +108,10 @@ exports.handler = async function (event, context) {
 
     const simplified = scored.slice(0, 5).map((p) => ({
       title: p.item_name,
-      price: p.retail,
+      price: p.retail, // as you currently send
       url: `https://www.mindkits.co.nz${p.url_rewrite}`,
-      // NEW: include long_description_1, HTML removed and trimmed
       long_description_1: stripHtml(p.long_description_1),
+      quantity_on_hand: Number.isFinite(p.quantity_on_hand) ? p.quantity_on_hand : null,
     }));
 
     const responseBody = {
